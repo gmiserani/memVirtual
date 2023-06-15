@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <errno.h>
 #include <string.h>
-#include <pthread.h>
-#include <unistd.h>
+#include <math.h>
+#include <ctype.h>
 /*essas variaveis globais compoem as estatisticas
 pedidas no enunciado do trabalho*/
 int lidas = 0;
@@ -11,7 +10,7 @@ int escritas = 0;
 int totalUsed = 0;
 int faults = 0;
 
-typedef struct Page {
+typedef struct Page_t {
 	unsigned addr;
 	struct Page_t *next;	
     struct Page_t *prev;
@@ -28,16 +27,26 @@ void AddNew(unsigned addr){
     latest->ref = 1;
     if(totalUsed == 0){
         first = latest;
-        latest->next = first;
-        last = latest->next;
+        first->next = last;
         current = first;
     }
     else{
-        last->next = latest;
-        latest->prev = last;
-        latest->next = first;
-        last = latest;
-        first->prev = last;
+        if(last == NULL){
+            last = latest;
+            last->prev = first;
+            first->next = latest;
+            last->next = first;
+            first->prev = last;
+        }
+        else{
+            last->next = latest;
+            latest->prev = last;
+            latest->next = first;
+            last = latest;
+            first->prev = last;
+            last->next = first;
+        }
+        
     }
     totalUsed++;
     escritas++;
@@ -78,7 +87,7 @@ void lruListModifier(Page_t *pag_addr){
     last = pag_addr;
 }
 
-void LRU(addr){
+void LRU(unsigned addr){
     //cria pagina com o novo end
     Page_t *new = (Page_t*)malloc(sizeof(Page_t));
     new->addr = addr;
@@ -95,7 +104,7 @@ void LRU(addr){
     escritas++;
 }
 
-void secondChance(addr){
+void secondChance(unsigned addr){
     Page_t *new = current;
     //Page_t *prox = new->next;
     while(current->ref == 1){
@@ -114,11 +123,12 @@ void secondChance(addr){
         }
         // if(prox->ref == 0){
         //     prox->addr = addr;
-        //     prox->ref = 1;
+        //     prox->ref = 1; 
         //     current = prox;
         //     break;
         // }
         new = new->next;
+        current = new;
     }
     if(current->ref == 0){
         printf("não há página a ser substituida sc");
@@ -126,28 +136,41 @@ void secondChance(addr){
 
 }
 
+void randomAlg(unsigned addr, int totalPages){
+    int pag_del = rand() % totalPages;
+    pag_del = pag_del-1;
+    Page_t *new = first;
+    int i = 0;
+    while(i < pag_del){
+        new = new->next;
+        i++;
+    }
+    new->addr = addr;
+}
+
 void writeAddress(unsigned addr, char *sub, int totalPages){
     if(strcmp(sub, "lru") == 0){
         LRU(addr);
     }
-    else if(strcmp(sub, "2a") == 0){
+    else if(strcmp(sub, "fifo") == 0){
         FIFO(addr);
     }
-    else if(strcmp(sub, "random") == 0){
+    else if(strcmp(sub, "2a") == 0){
         secondChance(addr);
     }
-    else if(strcmp(sub, "fifo") == 0){
-        randomAlg(addr);
+    else if(strcmp(sub, "random") == 0){
+        randomAlg(addr, totalPages);
     }
 }
 
 Page_t* AlreadyWritten(unsigned address){
     Page_t *aux = first;
-    while (aux->next != NULL || aux->next != first)
+    while (aux != NULL && aux != first)
     {
         if(aux->addr == address){
             return aux;
         }
+        aux = aux->next;
     }
     return NULL;
 }
@@ -156,11 +179,21 @@ int main(int argc, char* argv[]){
     FILE *file; 
     unsigned addr;
     char rw;
-    char *sub = argv[1];
-    file = fopen(argv[2], "r");
-    int pag = atoi(argv[3]);
-    int mem = atoi(argv[4]); 
+    // char *sub = argv[1];
+    // file = fopen(argv[2], "r");
+    // int pag = atoi(argv[3]);
+    // int mem = atoi(argv[4]); 
+    char *sub = "random";
+    file = fopen("matriz.log", "r");
+    int pag = 4;
+    int mem = 123;
     int totalPages = mem/pag;
+    first = (Page_t*)malloc(sizeof(Page_t));
+    last = (Page_t*)malloc(sizeof(Page_t));
+    first->next = NULL;
+    first->prev = NULL;
+    last->next = NULL;
+    last->prev = NULL;
     while(fscanf(file,"%x %c",&addr,&rw) != -1){
         //printf("%x",addr);
         Page_t* pag_addr = AlreadyWritten(addr);
