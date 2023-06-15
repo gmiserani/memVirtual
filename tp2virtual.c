@@ -15,23 +15,29 @@ typedef struct Page {
 	unsigned addr;
 	struct Page_t *next;	
     struct Page_t *prev;
+    int ref;
 }Page_t;
 
-Page_t *first, *last;
+Page_t *first, *last, *current;
 
 void AddNew(unsigned addr){
-    Page_t *current = (Page_t*)malloc(sizeof(Page_t));
-    current->addr = addr;
-    current->next = NULL;
-    current->prev = NULL;
+    Page_t *latest = (Page_t*)malloc(sizeof(Page_t));
+    latest->addr = addr;
+    latest->next = NULL;
+    latest->prev = NULL;
+    latest->ref = 1;
     if(totalUsed == 0){
-        first = current;
-        last = current->next;
+        first = latest;
+        latest->next = first;
+        last = latest->next;
+        current = first;
     }
     else{
-        last->next = current;
-        current->prev = last;
-        last = current;
+        last->next = latest;
+        latest->prev = last;
+        latest->next = first;
+        last = latest;
+        first->prev = last;
     }
     totalUsed++;
     escritas++;
@@ -44,11 +50,12 @@ void FIFO(unsigned addr){
     new->prev = NULL;
     //retiramos a primeira pagina da fila
     first = first->next;
-    first->prev = NULL;
     //colocamos a nova pagina no final
     last->next = new;
     new->prev = last;
+    new->next = first;
     last = new;
+    first->prev = last;
 
     escritas++;
 }
@@ -86,6 +93,37 @@ void LRU(addr){
     last = new;
 
     escritas++;
+}
+
+void secondChance(addr){
+    Page_t *new = current;
+    //Page_t *prox = new->next;
+    while(current->ref == 1){
+        //se o que esta sendo olhado pelo ponteiro for 1 da a segunda
+        //chance e troca para 0 
+        if(new->ref == 1){
+            new->ref = 0;
+        }
+        //se for 0, tira ele da fila e coloca o outro no lugar.
+        //na proxima vez que trocar de pagina, comeca nesse novo (current)
+        else{
+            new->addr = addr;
+            new->ref = 1;
+            current = new;
+            break;
+        }
+        // if(prox->ref == 0){
+        //     prox->addr = addr;
+        //     prox->ref = 1;
+        //     current = prox;
+        //     break;
+        // }
+        new = new->next;
+    }
+    if(current->ref == 0){
+        printf("não há página a ser substituida sc");
+    }
+
 }
 
 void writeAddress(unsigned addr, char *sub, int totalPages){
