@@ -22,29 +22,31 @@ Page_t *first, *last, *current;
 void AddNew(unsigned addr){
     Page_t *latest = (Page_t*)malloc(sizeof(Page_t));
     latest->addr = addr;
-    latest->next = NULL;
-    latest->prev = NULL;
+    latest->next = latest;
+    latest->prev = latest;
     latest->ref = 1;
     if(totalUsed == 0){
         first = latest;
-        first->next = last;
+        last = latest;
         current = first;
     }
     else{
-        if(last == NULL){
+        if(totalUsed == 1){
             last = latest;
-            last->prev = first;
-            first->next = latest;
             last->next = first;
+            last->prev = first;
+            first->next = last;
             first->prev = last;
+            current = first;
         }
         else{
-            last->next = latest;
-            latest->prev = last;
-            latest->next = first;
+            Page_t *aux = last;
+            aux->next = latest;
+            latest->prev = aux;
             last = latest;
-            first->prev = last;
             last->next = first;
+            first->prev = last;
+            current = first;
         }
         
     }
@@ -69,45 +71,62 @@ void FIFO(unsigned addr){
     escritas++;
 }
 
-void lruListModifier(Page_t *pag_addr){
+void lruListModifier(unsigned addr){
+    //pag_addr = pagina do endereco lido que ja estava na lista
     Page_t *aux = first;
-    while (aux->next != NULL || aux->next != first)
+    //procura a pagina na lista e tira ela de la, arrumando os ponteiros
+    //de que ta antes dela e de quem ta depois
+    for(int i = 0; i < totalUsed; i++)
     {
-        if(aux->next == pag_addr){
-            aux->next = pag_addr->next;
-        }
-        if(aux->prev == pag_addr){
-            aux->prev = pag_addr->prev;
+        if(aux->addr == addr){
             break;
         }
+        aux = aux->next;
     }
-    pag_addr->prev = last;
-    pag_addr->next = NULL;
-    last->next = pag_addr;
-    last = pag_addr;
+
+    if(aux->addr != last->addr){
+        if(aux->addr == first->addr){
+            first = first->next;
+        }
+        else{
+            //coloca ela no final da fila
+            aux->prev->next = aux->next;
+            aux->next->prev = aux->prev;
+            
+        }
+        aux->prev = last;
+        aux->next = first;
+        last->next = aux;
+        last = aux;
+        first->prev = last;
+    }
+
+    
 }
 
 void LRU(unsigned addr){
     //cria pagina com o novo end
     Page_t *new = (Page_t*)malloc(sizeof(Page_t));
+    Page_t *aux = (Page_t*)malloc(sizeof(Page_t));
     new->addr = addr;
-    new->next = NULL;
-    new->prev = NULL;
     //retira a pagina mais antiga
     first = first->next;
-    first->prev = NULL;
+    
     //coloca a pagina nova no topo da fila
     last->next = new;
     new->prev = last;
+    new->next = first;
     last = new;
+
+    first->prev = last;
 
     escritas++;
 }
 
 void secondChance(unsigned addr){
     Page_t *new = current;
-    //Page_t *prox = new->next;
-    while(current->ref == 1){
+    int found = 1;
+    while(found){
         //se o que esta sendo olhado pelo ponteiro for 1 da a segunda
         //chance e troca para 0 
         if(new->ref == 1){
@@ -118,22 +137,14 @@ void secondChance(unsigned addr){
         else{
             new->addr = addr;
             new->ref = 1;
-            current = new;
+            current = new->next;
+            found = 0;
             break;
         }
-        // if(prox->ref == 0){
-        //     prox->addr = addr;
-        //     prox->ref = 1; 
-        //     current = prox;
-        //     break;
-        // }
         new = new->next;
+
         current = new;
     }
-    if(current->ref == 0){
-        printf("não há página a ser substituida sc");
-    }
-
 }
 
 void randomAlg(unsigned addr, int totalPages){
@@ -165,14 +176,35 @@ void writeAddress(unsigned addr, char *sub, int totalPages){
 
 Page_t* AlreadyWritten(unsigned address){
     Page_t *aux = first;
-    while (aux != NULL && aux != first)
+    for(int i = 0; i < totalUsed; i++)
     {
         if(aux->addr == address){
+            aux->ref = 1;
+            current = aux->next;
             return aux;
         }
         aux = aux->next;
     }
     return NULL;
+}
+
+void printList(){
+    Page_t *aux = first;
+    for(int i = 0; i < totalUsed; i++){
+        printf("%X      %x       %x     %d\n", aux->prev->addr, aux->addr, aux->next->addr, aux->ref);
+        aux = aux->next;
+    }
+    printf("\n ------------------------------------\n");
+}
+
+int findS(int pag){
+    int s = 0;
+    int temp = pag * 1024;
+    while(temp > 1){
+        temp = temp >> 1;
+        s++;
+    }
+    return s;
 }
 
 int main(int argc, char* argv[]){
@@ -183,19 +215,19 @@ int main(int argc, char* argv[]){
     // file = fopen(argv[2], "r");
     // int pag = atoi(argv[3]);
     // int mem = atoi(argv[4]); 
-    char *sub = "random";
-    file = fopen("matriz.log", "r");
+    char *sub = "lru";
+    file = fopen("teste2a.log", "r");
     int pag = 4;
-    int mem = 123;
+    int mem = 12;
+    int s = findS(pag);
     int totalPages = mem/pag;
     first = (Page_t*)malloc(sizeof(Page_t));
     last = (Page_t*)malloc(sizeof(Page_t));
-    first->next = NULL;
-    first->prev = NULL;
-    last->next = NULL;
-    last->prev = NULL;
+    first = NULL;
+    last = NULL;
     while(fscanf(file,"%x %c",&addr,&rw) != -1){
         //printf("%x",addr);
+        addr = addr >> s;
         Page_t* pag_addr = AlreadyWritten(addr);
         if(rw == 'W' || rw == 'w'){
             if(pag_addr == NULL){
@@ -212,7 +244,7 @@ int main(int argc, char* argv[]){
             referenciada
             */
             else if(strcmp(sub, "lru") == 0){
-                lruListModifier(pag_addr);
+                lruListModifier(addr);
             }
 		}
         else if(rw == 'R' || rw == 'r'){
@@ -224,10 +256,11 @@ int main(int argc, char* argv[]){
                 }faults++;
             }
             else if(strcmp(sub, "lru") == 0){
-                lruListModifier(pag_addr);
+                lruListModifier(addr);
             }
             lidas++;
         }
+        printList();
     }
     fclose(file);
 }
