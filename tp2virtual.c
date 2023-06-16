@@ -27,7 +27,7 @@ void AddNew(unsigned addr, int modificada){
     latest->next = latest;
     latest->prev = latest;
     latest->ref = 1;
-    if(modificada = 1){
+    if(modificada == 1){
         latest->w = 1;
     }
     else{
@@ -123,7 +123,6 @@ void lruListModifier(unsigned addr, int modificada){
 void LRU(unsigned addr, int modificada){
     //cria pagina com o novo end
     Page_t *new = (Page_t*)malloc(sizeof(Page_t));
-    Page_t *aux = (Page_t*)malloc(sizeof(Page_t));
     new->addr = addr;
     if(modificada == 1){
         new->w = 1;
